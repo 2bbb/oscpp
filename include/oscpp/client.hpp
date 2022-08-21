@@ -31,48 +31,28 @@
 
 #include <cstdint>
 #include <limits>
-#include <sstream>
 #include <stdexcept>
 #include <type_traits>
 
-namespace OSCPP { namespace Client {
+namespace OSCPP {
+namespace Client {
 
 //! OSC packet construction.
 /*!
- * Construct a valid OSC packet for transmitting over a transport
- * medium.
+ * Construct a valid OSC packet for transmitting over a transport medium.
  */
 class Packet
 {
-    int32_t ptrDiff(const char* a, const char* b)
-    {
-        // Make sure pointer difference fits into int32_t
-        const intptr_t diff = a - b;
-        if (diff < std::numeric_limits<int32_t>::min() ||
-            diff > std::numeric_limits<int32_t>::max())
-        {
-            std::stringstream s;
-            s << "Pointer difference " << diff
-              << " can't be represented by int32_t";
-            throw std::logic_error(s.str());
-        }
-        return static_cast<int32_t>(diff);
-    }
-
     int32_t calcSize(const char* begin, const char* end)
     {
-        const int32_t size = ptrDiff(end, begin) - 4;
-        if (size < 0)
-        {
-            throw std::logic_error("Calculated size is negative");
-        }
-        return size;
+        // TODO: Make sure pointer difference fits into int32_t
+        return end - begin - 4;
     }
 
 public:
     //! Constructor.
     /*!
-     */
+    */
     Packet()
     {
         reset(0, 0);
@@ -80,20 +60,18 @@ public:
 
     //! Constructor.
     /*!
-     */
+    */
     Packet(void* buffer, size_t size)
     {
         reset(buffer, size);
     }
 
     //! Destructor.
-    virtual ~Packet()
-    {}
+    virtual ~Packet() { }
 
     //! Get packet buffer address.
     /*!
-     * Return the start address of the packet currently under
-     * construction.
+     * Return the start address of the packet currently under construction.
      */
     void* data() const
     {
@@ -132,22 +110,17 @@ public:
 
     Packet& openBundle(uint64_t time)
     {
-        if (m_inBundle > 0)
-        {
-            assert(m_sizePosB != nullptr || m_inBundle == 1);
+        if (m_inBundle > 0) {
             // Remember previous size pos offset
-            const int32_t offset =
-                m_sizePosB == nullptr ? 0 : ptrDiff(m_sizePosB, m_args.begin());
+            // TODO: Make sure pointer difference fits into int32_t
+            const int32_t offset = m_sizePosB - m_args.begin();
             char* curPos = m_args.pos();
             m_args.skip(4);
             // Record size pos
             std::memcpy(curPos, &offset, 4);
             m_sizePosB = curPos;
-        }
-        else if (m_args.pos() != m_args.begin())
-        {
-            throw std::logic_error(
-                "Cannot open toplevel bundle in non-empty packet");
+        } else if (m_args.pos() != m_args.begin()) {
+            throw std::logic_error("Cannot open toplevel bundle in non-empty packet");
         }
 
         m_inBundle++;
@@ -158,10 +131,8 @@ public:
 
     Packet& closeBundle()
     {
-        if (m_inBundle > 0)
-        {
-            if (m_inBundle > 1)
-            {
+        if (m_inBundle > 0) {
+            if (m_inBundle > 1) {
                 // Get current stream pos
                 char* curPos = m_args.pos();
 
@@ -172,8 +143,7 @@ public:
                 char* prevPos = m_args.begin() + offset;
 
                 const int32_t bundleSize = calcSize(m_sizePosB, curPos);
-                assert(bundleSize >= 0 &&
-                       (size_t)bundleSize >= Size::bundle(0));
+                assert(bundleSize >= 0 && (size_t)bundleSize >= Size::bundle(0));
                 // Write bundle size
                 m_args.setPos(m_sizePosB);
                 m_args.putInt32(bundleSize);
@@ -183,19 +153,15 @@ public:
                 m_sizePosB = prevPos;
             }
             m_inBundle--;
-        }
-        else
-        {
-            throw std::logic_error(
-                "closeBundle() without matching openBundle()");
+        } else {
+            throw std::logic_error("closeBundle() without matching openBundle()");
         }
         return *this;
     }
 
     Packet& openMessage(const char* addr, size_t numTags)
     {
-        if (m_inBundle > 0)
-        {
+        if (m_inBundle > 0) {
             // record message size pos
             m_sizePosM = m_args.pos();
             // advance arg stream
@@ -211,8 +177,7 @@ public:
 
     Packet& closeMessage()
     {
-        if (m_inBundle > 0)
-        {
+        if (m_inBundle > 0) {
             // Get current stream pos
             char* curPos = m_args.pos();
             // write message size
@@ -226,6 +191,18 @@ public:
         return *this;
     }
 
+    Packet& boolean(bool arg)
+    {
+        m_tags.putChar(arg ? 'T' : 'F');
+        return *this;
+    }
+    
+    Packet& character(char arg)
+    {
+        m_tags.putChar('c');
+        m_args.putCharacter(arg);
+        return *this;
+    }
     //! Write integer message argument.
     /*!
      * Write a 32 bit integer message argument.
@@ -237,10 +214,17 @@ public:
      *
      * \throw OSCPP::XRunError stream buffer xrun.
      */
+
     Packet& int32(int32_t arg)
     {
         m_tags.putChar('i');
         m_args.putInt32(arg);
+        return *this;
+    }
+    Packet& int64(int64_t arg)
+    {
+        m_tags.putChar('h');
+        m_args.putUInt64(*(uint64_t *)(&arg));
         return *this;
     }
 
@@ -250,25 +234,42 @@ public:
         m_args.putFloat32(arg);
         return *this;
     }
+    Packet& float64(double arg)
+    {
+        m_tags.putChar('d');
+        m_args.putFloat64(arg);
+        return *this;
+    }
 
+    Packet& string(const std::string &arg)
+    {
+        return this->string(arg.c_str());
+    }
     Packet& string(const char* arg)
     {
         m_tags.putChar('s');
         m_args.putString(arg);
         return *this;
     }
-
-    // @throw std::invalid_argument if blob size is greater than
-    // std::numeric_limits<int32_t>::max()
+    
+    Packet& symbol(const std::string &arg)
+    {
+        return this->symbol(arg.c_str());
+    }
+    Packet& symbol(const char* arg)
+    {
+        m_tags.putChar('S');
+        m_args.putString(arg);
+        return *this;
+    }
+    
+    // @throw std::invalid_argument if blob size is greater than std::numeric_limits<int32_t>::max()
     Packet& blob(const Blob& arg)
     {
         if (arg.size() > (size_t)std::numeric_limits<int32_t>::max())
-        {
-            throw std::invalid_argument("Blob size greater than maximum "
-                                        "value representable by int32_t");
-        }
+            throw std::invalid_argument("Blob size greater than maximum value representable by int32_t");
         m_tags.putChar('b');
-        m_args.putInt32(static_cast<int32_t>(arg.size()));
+        m_args.putInt32(arg.size());
         m_args.putData(arg.data(), arg.size());
         return *this;
     }
@@ -291,18 +292,15 @@ public:
         return *this;
     }
 
-    template <typename InputIterator>
-    Packet& put(InputIterator begin, InputIterator end)
+    template <typename InputIterator> Packet& put(InputIterator begin, InputIterator end)
     {
-        for (auto it = begin; it != end; it++)
-        {
+        for (auto it = begin; it != end; it++) {
             put(*it);
         }
         return *this;
     }
 
-    template <typename InputIterator>
-    Packet& putArray(InputIterator begin, InputIterator end)
+    template <typename InputIterator> Packet& putArray(InputIterator begin, InputIterator end)
     {
         openArray();
         put<InputIterator>(begin, end);
@@ -313,40 +311,27 @@ public:
 private:
     void*       m_buffer;
     size_t      m_capacity;
-    WriteStream m_args;     // packet stream
-    WriteStream m_tags;     // current tag stream
-    char*       m_sizePosM; // last message size position
-    char*       m_sizePosB; // last bundle size position
-    size_t      m_inBundle; // bundle nesting depth
+    WriteStream m_args;         // packet stream
+    WriteStream m_tags;         // current tag stream
+    char*       m_sizePosM;     // last message size position
+    char*       m_sizePosB;     // last bundle size position
+    size_t      m_inBundle;     // bundle nesting depth
 };
 
-template <> inline Packet& Packet::put<int32_t>(int32_t x)
-{
-    return int32(x);
-}
-template <> inline Packet& Packet::put<float>(float x)
-{
-    return float32(x);
-}
-template <> inline Packet& Packet::put<const char*>(const char* x)
-{
-    return string(x);
-}
-template <> inline Packet& Packet::put<Blob>(Blob x)
-{
-    return blob(x);
-}
+template <> inline Packet& Packet::put<int32_t>(int32_t x) { return int32(x); }
+template <> inline Packet& Packet::put<float>(float x) { return float32(x); }
+template <> inline Packet& Packet::put<const char*>(const char* x) { return string(x); }
+template <> inline Packet& Packet::put<Blob>(Blob x) { return blob(x); }
 
 template <size_t buffer_size> class StaticPacket : public Packet
 {
 public:
     StaticPacket()
-    : Packet(reinterpret_cast<char*>(&m_buffer), buffer_size)
-    {}
+        : Packet(reinterpret_cast<char*>(&m_buffer), buffer_size)
+    { }
 
 private:
-    typedef typename std::aligned_storage<buffer_size, kAlignment>::type
-                  AlignedBuffer;
+    typedef typename std::aligned_storage<buffer_size,kAlignment>::type AlignedBuffer;
     AlignedBuffer m_buffer;
 };
 
@@ -354,15 +339,16 @@ class DynamicPacket : public Packet
 {
 public:
     DynamicPacket(size_t buffer_size)
-    : Packet(static_cast<char*>(new char[buffer_size]), buffer_size)
-    {}
+        : Packet(static_cast<char*>(new char[buffer_size]), buffer_size)
+    { }
 
     ~DynamicPacket()
     {
-        delete[] static_cast<char*>(data());
+        delete [] static_cast<char*>(data());
     }
 };
 
-}} // namespace OSCPP::Client
+}
+}
 
 #endif // OSCPP_CLIENT_HPP_INCLUDED
