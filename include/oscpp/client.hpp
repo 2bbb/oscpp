@@ -191,15 +191,25 @@ public:
         return *this;
     }
 
+    Packet& impulse() {
+        m_tags.putChar(Tag::IMPULSE);
+        return *this;
+    }
+    
+    Packet& NIL() {
+        m_tags.putChar(Tag::NIL);
+        return *this;
+    }
+
     Packet& boolean(bool arg)
     {
-        m_tags.putChar(arg ? 'T' : 'F');
+        m_tags.putChar(arg ? Tag::True : Tag::False);
         return *this;
     }
     
     Packet& character(char arg)
     {
-        m_tags.putChar('c');
+        m_tags.putChar(Tag::Char);
         m_args.putCharacter(arg);
         return *this;
     }
@@ -217,26 +227,26 @@ public:
 
     Packet& int32(int32_t arg)
     {
-        m_tags.putChar('i');
+        m_tags.putChar(Tag::Int32);
         m_args.putInt32(arg);
         return *this;
     }
     Packet& int64(int64_t arg)
     {
-        m_tags.putChar('h');
+        m_tags.putChar(Tag::Int64);
         m_args.putUInt64(*(uint64_t *)(&arg));
         return *this;
     }
 
     Packet& float32(float arg)
     {
-        m_tags.putChar('f');
+        m_tags.putChar(Tag::Float);
         m_args.putFloat32(arg);
         return *this;
     }
     Packet& float64(double arg)
     {
-        m_tags.putChar('d');
+        m_tags.putChar(Tag::Double);
         m_args.putFloat64(arg);
         return *this;
     }
@@ -247,7 +257,7 @@ public:
     }
     Packet& string(const char* arg)
     {
-        m_tags.putChar('s');
+        m_tags.putChar(Tag::String);
         m_args.putString(arg);
         return *this;
     }
@@ -258,17 +268,37 @@ public:
     }
     Packet& symbol(const char* arg)
     {
-        m_tags.putChar('S');
+        m_tags.putChar(Tag::Symbol);
         m_args.putString(arg);
         return *this;
     }
     
+    Packet& midi(int32_t arg)
+    {
+        m_tags.putChar(Tag::Midi4);
+        m_args.putInt32(arg);
+        return *this;
+    }
+
+    Packet& rgba(int32_t arg)
+    {
+        m_tags.putChar(Tag::RGBA);
+        m_args.putInt32(arg);
+        return *this;
+    }
+
+    Packet& timetag(uint64_t arg)
+    {
+        m_tags.putChar(Tag::Timetag);
+        m_args.putUInt64(arg);
+        return *this;
+    }
     // @throw std::invalid_argument if blob size is greater than std::numeric_limits<int32_t>::max()
     Packet& blob(const Blob& arg)
     {
         if (arg.size() > (size_t)std::numeric_limits<int32_t>::max())
             throw std::invalid_argument("Blob size greater than maximum value representable by int32_t");
-        m_tags.putChar('b');
+        m_tags.putChar(Tag::Blob);
         m_args.putInt32((int32_t)arg.size());
         m_args.putData(arg.data(), arg.size());
         return *this;
