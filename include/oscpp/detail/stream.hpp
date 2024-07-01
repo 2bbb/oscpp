@@ -176,6 +176,12 @@ public:
         advance(n);
     }
 
+    void putChar(Tag t)
+    {
+        checkWritable(1);
+        *pos() = static_cast<char>(t);
+        advance(1);
+    }
     void putChar(char c)
     {
         checkWritable(1);
