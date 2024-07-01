@@ -46,7 +46,7 @@ class Packet
     int32_t calcSize(const char* begin, const char* end)
     {
         // TODO: Make sure pointer difference fits into int32_t
-        return end - begin - 4;
+        return (int32_t)(end - begin - 4);
     }
 
 public:
@@ -113,7 +113,7 @@ public:
         if (m_inBundle > 0) {
             // Remember previous size pos offset
             // TODO: Make sure pointer difference fits into int32_t
-            const int32_t offset = m_sizePosB - m_args.begin();
+            const int32_t offset = (int32_t)(m_sizePosB - m_args.begin());
             char* curPos = m_args.pos();
             m_args.skip(4);
             // Record size pos
@@ -269,7 +269,7 @@ public:
         if (arg.size() > (size_t)std::numeric_limits<int32_t>::max())
             throw std::invalid_argument("Blob size greater than maximum value representable by int32_t");
         m_tags.putChar('b');
-        m_args.putInt32(arg.size());
+        m_args.putInt32((int32_t)arg.size());
         m_args.putData(arg.data(), arg.size());
         return *this;
     }
