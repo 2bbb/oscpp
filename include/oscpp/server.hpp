@@ -127,6 +127,9 @@ public:
             case Tag::Int64:
             case Tag::Float:
             case Tag::Double:
+            case Tag::Midi4:
+            case Tag::RGBA:
+            case Tag::Timetag:
                 return true;
             default:
                 return false;
@@ -150,6 +153,11 @@ public:
                 return (type)m_args.getFloat32();
             case Tag::Double:
                 return (type)m_args.getFloat64();
+            case Tag::Midi4:
+            case Tag::RGBA:
+                return (type)m_args.getInt32();
+            case Tag::Timetag:
+                return (type)m_args.getUInt64();
             default:
                 return (type)0;
         }
@@ -167,7 +175,7 @@ public:
     {
         const char t = m_tags.getChar();
         if(isNumeral(t)) return getNumAsType<bool>(t);
-        throw ParseError("Cannot convert argument to int");
+        throw ParseError("[boolean] Cannot convert argument to bool");
     }
     
     //! Get next integer argument.
@@ -182,7 +190,7 @@ public:
     {
         const char t = m_tags.getChar();
         if(isNumeral(t)) return getNumAsType<int8_t>(t);
-        throw ParseError("Cannot convert argument to int");
+        throw ParseError("[int8] Cannot convert argument to int");
     }
     
     //! Get next integer argument.
@@ -197,7 +205,7 @@ public:
     {
         const char t = m_tags.getChar();
         if(isNumeral(t)) return getNumAsType<int32_t>(t);
-        throw ParseError("Cannot convert argument to int");
+        throw ParseError("[int32] Cannot convert argument to int32");
     }
 
     //! Get next integer argument.
@@ -212,7 +220,22 @@ public:
     {
         const char t = m_tags.getChar();
         if(isNumeral(t)) return getNumAsType<int64_t>(t);
-        throw ParseError("Cannot convert argument to int");
+        throw ParseError("[int64] Cannot convert argument to int");
+    }
+    
+    //! Get next integer argument.
+    /*!
+     * Read next numerical argument from the input stream and convert it to
+     * an integer.
+     *
+     * \exception OSCPP::UnderrunError stream buffer underrun.
+     * \exception OSCPP::ParseError argument could not be converted.
+     */
+    uint64_t uint64()
+    {
+        const char t = m_tags.getChar();
+        if(isNumeral(t)) return getNumAsType<uint64_t>(t);
+        throw ParseError("[uint64] Cannot convert argument to uint64");
     }
     
     //! Get next float argument.
@@ -234,7 +257,7 @@ public:
             default:
                 break;
         }
-        throw ParseError("Cannot convert argument to float");
+        throw ParseError("[float32] Cannot convert argument to float");
     }
 
     //! Get next float argument.
@@ -249,7 +272,7 @@ public:
     {
         const char t = m_tags.getChar();
         if(isNumeral(t)) return getNumAsType<double>(t);
-        throw ParseError("Cannot convert argument to float");
+        throw ParseError("[float64] Cannot convert argument to double");
     }
     
     //! Get next string argument.
@@ -265,7 +288,39 @@ public:
         if (m_tags.getChar() == 's' || m_tags.getChar() == 'S') {
             return m_args.getString();
         }
-        throw ParseError("Cannot convert argument to string");
+        throw ParseError("[string] Cannot convert argument to string");
+    }
+
+    /*!
+     * Read next numerical argument from the input stream and convert it to
+     * an integer.
+     *
+     * \exception OSCPP::UnderrunError stream buffer underrun.
+     * \exception OSCPP::ParseError argument could not be converted.
+     */
+    int32_t midi4()
+    {
+        const char t = m_tags.getChar();
+        if(isNumeral(t)) {
+            return getNumAsType<int32_t>(t);
+        }
+        throw ParseError("[midi4] Cannot convert argument to int32");
+    }
+
+    /*!
+     * Read next numerical argument from the input stream and convert it to
+     * an integer.
+     *
+     * \exception OSCPP::UnderrunError stream buffer underrun.
+     * \exception OSCPP::ParseError argument could not be converted.
+     */
+    int32_t rgba()
+    {
+        const char t = m_tags.getChar();
+        if(isNumeral(t)) {
+            return getNumAsType<int32_t>(t);
+        }
+        throw ParseError("[rgba] Cannot convert argument to int32");
     }
 
     //* Get next blob argument.
@@ -319,11 +374,31 @@ private:
     // Drop an atomic value of type t (type tag already consumed).
     void dropAtom(char t)
     {
-        switch (t) {
-            case 'i': m_args.skip(4); break;
-            case 'f': m_args.skip(4); break;
-            case 's': m_args.getString(); break;
-            case 'b': parseBlob(); break;
+        switch (static_cast<Tag>(t)) {
+            case Tag::True:
+            case Tag::False:
+            case Tag::NIL:
+            case Tag::IMPULSE:
+                break;
+            case Tag::Char:
+            case Tag::Int32:
+            case Tag::Float:
+            case Tag::Midi4:
+            case Tag::RGBA:
+                m_args.skip(4);
+                break;
+            case Tag::Int64:
+            case Tag::Double:
+            case Tag::Timetag:
+                m_args.skip(4);
+                break;
+            case Tag::String:
+            case Tag::Symbol:
+                m_args.getString();
+                break;
+            case Tag::Blob:
+                parseBlob();
+                break;
         }
     }
     // Drop a possibly nested array.
@@ -511,9 +586,24 @@ template <> inline int32_t ArgStream::next<int32_t>()
     return int32();
 }
 
+template <> inline int64_t ArgStream::next<int64_t>()
+{
+    return int64();
+}
+
+template <> inline uint64_t ArgStream::next<uint64_t>()
+{
+    return uint64();
+}
+
 template <> inline float ArgStream::next<float>()
 {
     return float32();
+}
+
+template <> inline double ArgStream::next<double>()
+{
+    return float64();
 }
 
 template <> inline const char* ArgStream::next<const char*>()
