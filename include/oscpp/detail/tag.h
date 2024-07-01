@@ -39,10 +39,12 @@ namespace OSCPP {
         Symbol = 'S',
         Char = 'c',
         Midi4 = 'm',
+        RGBA = 'r',
         True = 'T',
         False = 'F',
         NIL = 'N',
         IMPULSE = 'I',
+        Blob = 'b',
         Timetag = 't',
     };
 
@@ -65,10 +67,12 @@ namespace OSCPP {
             TagCase(Symbol);
             TagCase(Char);
             TagCase(Midi4);
+            TagCase(RGBA);
             TagCase(True);
             TagCase(False);
             TagCase(NIL);
             TagCase(IMPULSE);
+            TagCase(Blob);
             TagCase(Timetag);
             default: return "unknown tag";
         }
