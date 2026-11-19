@@ -29,6 +29,10 @@
 #include <oscpp/detail/endian.hpp>
 #include <stdexcept>
 
+#if defined(_MSC_VER) || defined(_WIN32)
+# include <stdlib.h>
+#endif
+
 namespace OSCPP
 {
 #if defined(__GNUC__)
@@ -40,8 +44,7 @@ namespace OSCPP
     {
         return __builtin_bswap64(x);
     }
-#elif defined(_WINDOWS_)
-#   include <stdlib.h>
+#elif defined(_MSC_VER) || defined(_WIN32)
     inline static uint32_t bswap32(uint32_t x)
     {
         return _byteswap_ulong(x);
